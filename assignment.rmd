@@ -1,0 +1,117 @@
+---
+title: "Human Activity Recognition"
+author: "Jesse Schevers"
+date: "Saturday, July 25, 2015"
+output: html_document
+---
+# Introduction
+This is the report for the  **Coursera** course *Practical Machine Learning*.
+We will use data from accelerometers on the belt, forearm, arm, and dumbbel of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Our goal is to predict *how well* a weightlifting exercise is performed.  
+
+More information is available on the [HAR](http://groupware.les.inf.puc-rio.br/har) website.
+
+```{r libs, echo=FALSE,cache=TRUE,message=FALSE}
+library(caret)
+library(knitr)
+library(ggplot2)
+```
+ 
+## Data
+The Weight Lifting Exercise Dataset can be downloaded here:
+ 
+* [training dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv) 
+* [test dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+ 
+There are five *Classes* quantifying what *how well* means:  
+ 
+* Class **A**: exactly according to the specification,
+* Class **B**: throwing the elbows to the front, 
+* Class **C**: lifting the dumbbell only halfway,
+* Class **D**: lowering the dumbbell only halfway,
+* Class **E**: throwing the hips to the front  
+
+I will split the (downloaded) training dataset into a trainingset and a validationset. The trainingset will be used to build the model(s), the validationset for cross-validation and the (downloaded) test dataset for the assignment submission.  
+We can't use all the variables. There first few variables are about the experiment set-up.  The variables with a lot of Na's (or NULL's) will be removed. 
+ 
+ 
+```{r data,echo=FALSE,cache=TRUE}
+# download and reading trainingdata
+train_url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+train_csv="pml-training.csv"
+if (!file.exists(train_csv)){download.file(train_url,destfile=train_csv)}
+training=data.frame(read.csv(train_csv),stringsAsFactors=FALSE)
+ 
+# download and reading testdata
+test_url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+test_csv="pml-testing.csv"
+if (!file.exists(test_csv)){download.file(test_url,destfile=test_csv)}
+testing=data.frame(read.csv(test_csv),stringsAsFactors=FALSE)
+
+# create trainset and validationset
+set.seed(12345)
+inTrain <- createDataPartition(y=training$classe,p=0.4, list=FALSE)
+trainset=training[inTrain,]
+valset=training[-inTrain,]
+
+## fields to use
+fields=c('classe'
+         ,'roll_belt','pitch_belt','yaw_belt','total_accel_belt'
+         ,'gyros_belt_x','gyros_belt_y','gyros_belt_z'
+         ,'accel_belt_x','accel_belt_y','accel_belt_z'
+         ,'magnet_belt_x','magnet_belt_y','magnet_belt_z'
+         ,'roll_arm','pitch_arm','yaw_arm','total_accel_arm'
+         ,'gyros_arm_x','gyros_arm_y','gyros_arm_z'
+         ,'accel_arm_x','accel_arm_y','accel_arm_z'
+         ,'magnet_arm_x','magnet_arm_y','magnet_arm_z'
+         ,'roll_dumbbell','pitch_dumbbell','yaw_dumbbell','total_accel_dumbbell'
+         ,'gyros_dumbbell_x','gyros_dumbbell_y','gyros_dumbbell_z'
+         ,'accel_dumbbell_x','accel_dumbbell_y','accel_dumbbell_z'
+         ,'magnet_dumbbell_x','magnet_dumbbell_y','magnet_dumbbell_z'
+         ,'roll_forearm','pitch_forearm','yaw_forearm','total_accel_forearm'
+         ,'gyros_forearm_x','gyros_forearm_y','gyros_forearm_z'
+         ,'accel_forearm_x','accel_forearm_y','accel_forearm_z'
+         ,'magnet_forearm_x','magnet_forearm_y','magnet_forearm_z')
+#reduce covariats
+trainset=trainset[,fields]
+```
+
+The variable we are trying to predict is **classe*. The covariates are:  
+```{r cov,echo=FALSE,cache=TRUE}
+kable(matrix(fields[-c(1)],ncol=4))
+```
+
+
+
+## Model 
+Since this is a classification problem I will use tree-bases-model. A single tree can easily be interpreted, but the covariates itself are not very interpretable (a lot of sensor-data), so interpretably  is not so much of an issue here.  
+Building a random forest based on conditional inference trees (cforest) did not work (computer ran out of memory). So a *cforest* is not an option. 
+So I will go for a **random forest**. 
+ 
+```{r ctree,echo=FALSE,cache=TRUE,eval=FALSE}
+
+fit_ctree=train(y=trainset$classe , x=trainset[,!names(trainset)=="classe"]
+                ,method="ctree",tuneGrid=expand.grid(mincriterion = .95))
+valset$pred_ctree=predict(fit_ctree,newdata=valset)
+confusionMatrix(data=valset$pred_ctree,reference=valset$classe)
+varImp(fit_ctree)
+
+```
+ 
+## Random forest
+
+```{r rf,echo=FALSE,cache=TRUE}
+fit_forest= train(y=trainset$classe , x=trainset[,!names(trainset)=="classe"]
+                ,method="rf")
+
+valset$pred_rf= predict(fit_forest,newdata=valset)
+cM=confusionMatrix(data=valset$pred_rf,reference=valset$classe) 
+oob=(valset$classe==valset$pref_rf)*1
+
+```
+## Results 
+`r cM`  
+oob: r oob`
+ 
+# Rcode
+ 
+ 
