@@ -1,3 +1,3 @@
 # jschevers.github.io
-go to: 
+go to:
 http://jschevers.github.io/assignment.html
