@@ -4,19 +4,19 @@ author: "Jesse Schevers"
 date: "Saturday, July 25, 2015"
 output: html_document
 ---
-# Introduction
-This is the report for the  **Coursera** course *Practical Machine Learning*.
-We will use data from accelerometers on the belt, forearm, arm, and dumbbel of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Our goal is to predict *how well* a weightlifting exercise is performed.  
+## Introduction
+This is the report for the  **Coursera** course *Practical Machine Learning*. Our goal is to predict *how well* a weightlifting exercise is performed. 
+We will use data from accelerometers on the belt, forearm, arm, and dumbbel of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.   
 
 More information is available on the [HAR](http://groupware.les.inf.puc-rio.br/har) website.
 
-```{r libs, echo=FALSE,cache=TRUE,message=FALSE}
+```{r libs, echo=FALSE,message=FALSE}
 library(caret)
 library(knitr)
 library(ggplot2)
 ```
  
-## Data
+## The Data
 The Weight Lifting Exercise Dataset can be downloaded here:
  
 * [training dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv) 
@@ -31,7 +31,7 @@ There are five *Classes* quantifying what *how well* means:
 * Class **E**: throwing the hips to the front  
 
 I will split the (downloaded) training dataset into a trainingset and a validationset. The trainingset will be used to build the model(s), the validationset for cross-validation and the (downloaded) test dataset for the assignment submission.  
-We can't use all the variables. There first few variables are about the experiment set-up.  The variables with a lot of Na's (or NULL's) will be removed. 
+We can't use all the variables. There first few variables are about the experiment set-up. The variables with Na's (or NULL's) have only few or no values. In the test dataset, these variables have all missing values. So they will be removed. 
  
  
 ```{r data,echo=FALSE,cache=TRUE}
@@ -40,16 +40,24 @@ train_url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
 train_csv="pml-training.csv"
 if (!file.exists(train_csv)){download.file(train_url,destfile=train_csv)}
 training=data.frame(read.csv(train_csv),stringsAsFactors=FALSE)
+#set all integer to numeric
+for (i in 1:ncol(training))
+{ if (class(training[,i])=="integer")
+{training[,i]=as.numeric(training[,i])}}
  
 # download and reading testdata
 test_url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
 test_csv="pml-testing.csv"
 if (!file.exists(test_csv)){download.file(test_url,destfile=test_csv)}
 testing=data.frame(read.csv(test_csv),stringsAsFactors=FALSE)
+#set all integer to numeric
+for (i in 1:ncol(testing))
+{ if (class(testing[,i])=="integer")
+{testing[,i]=as.numeric(testing[,i])}}
 
 # create trainset and validationset
 set.seed(12345)
-inTrain <- createDataPartition(y=training$classe,p=0.4, list=FALSE)
+inTrain <- createDataPartition(y=training$classe,p=0.8, list=FALSE)
 trainset=training[inTrain,]
 valset=training[-inTrain,]
 
@@ -75,43 +83,34 @@ fields=c('classe'
 trainset=trainset[,fields]
 ```
 
-The variable we are trying to predict is **classe*. The covariates are:  
+The variable we are trying to predict is **classe**. The covariates are:  
 ```{r cov,echo=FALSE,cache=TRUE}
 kable(matrix(fields[-c(1)],ncol=4))
 ```
 
-
-
-## Model 
-Since this is a classification problem I will use tree-bases-model. A single tree can easily be interpreted, but the covariates itself are not very interpretable (a lot of sensor-data), so interpretably  is not so much of an issue here.  
-Building a random forest based on conditional inference trees (cforest) did not work (computer ran out of memory). So a *cforest* is not an option. 
+## The Model 
+Since this is a classification problem I will use tree-based-models. A single tree can easily be interpreted, but the covariates itself are not very interpretable (a lot of sensor-data), so interpretably  is not so much of an issue here. A random forest is much more powerful.  
+Building a random forest based on conditional inference trees (cforest) did not work (computer ran out of memory). So a *cforest* is not an option (for me). 
 So I will go for a **random forest**. 
+  
+## Results Random Forest
+
+The trainingset will be used for building the model. 
+I used the validationset for cross-validation. Let's take a look at the confusionmatrix: 
  
-```{r ctree,echo=FALSE,cache=TRUE,eval=FALSE}
-
-fit_ctree=train(y=trainset$classe , x=trainset[,!names(trainset)=="classe"]
-                ,method="ctree",tuneGrid=expand.grid(mincriterion = .95))
-valset$pred_ctree=predict(fit_ctree,newdata=valset)
-confusionMatrix(data=valset$pred_ctree,reference=valset$classe)
-varImp(fit_ctree)
-
-```
- 
-## Random forest
-
-```{r rf,echo=FALSE,cache=TRUE}
-fit_forest= train(y=trainset$classe , x=trainset[,!names(trainset)=="classe"]
-                ,method="rf")
-
-valset$pred_rf= predict(fit_forest,newdata=valset)
+```{r rf,echo=FALSE,cache=TRUE,message=FALSE}
+#fit_forest= train(y=trainset$classe , x=trainset[,!names(trainset)=="classe"]
+#                ,method="rf")
+#saveRDS(fit_forest, file="fit_forest.rds")
+fit_forest=readRDS("fit_forest.rds")
+valset$pred_rf= predict(fit_forest,newdata=valset[,fields])
 cM=confusionMatrix(data=valset$pred_rf,reference=valset$classe) 
-oob=(valset$classe==valset$pref_rf)*1
-
-```
-## Results 
-`r cM`  
-oob: r oob`
- 
-# Rcode
+acc=cM$overall["Accuracy"]
+oob=round((1-acc),digits=3)
+cM
+#plot(fit_forest$finalModel)
+#plot(fit_forest)
+``` 
+The *Accuracy* on the validationset is `r round(acc,digits=3)`, so the *out of sample error rate* is 1-`r round(acc,digits=3)`=  `r oob`. Since the validationset is not used for building the model, this is a good estimate for the *out of sample error*.
  
  
