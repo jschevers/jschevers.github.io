@@ -89,28 +89,36 @@ kable(matrix(fields[-c(1)],ncol=4))
 ```
 
 ## The Model 
-Since this is a classification problem I will use tree-based-models. A single tree can easily be interpreted, but the covariates itself are not very interpretable (a lot of sensor-data), so interpretably  is not so much of an issue here. A random forest is much more powerful.  
-Building a random forest based on conditional inference trees (cforest) did not work (computer ran out of memory). So a *cforest* is not an option (for me). 
+Since this is a classification problem I will use tree-based-models. A single tree can easily be interpreted, but the covariates itself are not very interpretable (a lot of sensor-data), so interpretably is not so much of an issue here, therefore a random forest is much more interesting. (of course I did build a single tree (ctree), but I was not a very good predictor)  
+First I tried to build a random forest based on conditional inference trees (cforest), but my computer ran out of memory. So a *cforest* is not an option (for me). 
 So I will go for a **random forest**. 
   
 ## Results Random Forest
 
-The trainingset will be used for building the model. 
-I used the validationset for cross-validation. Let's take a look at the confusionmatrix: 
+The trainingset will be used for building the model. I will save the resulting "train"-object on disk and load it when I need it.   
  
-```{r rf,echo=FALSE,cache=TRUE,message=FALSE}
+```{r rf,echo=TRUE,cache=TRUE,message=FALSE}
 #fit_forest= train(y=trainset$classe , x=trainset[,!names(trainset)=="classe"]
 #                ,method="rf")
 #saveRDS(fit_forest, file="fit_forest.rds")
 fit_forest=readRDS("fit_forest.rds")
 valset$pred_rf= predict(fit_forest,newdata=valset[,fields])
 cM=confusionMatrix(data=valset$pred_rf,reference=valset$classe) 
+``` 
+ 
+I used the validationset for cross-validation. Let's take a look at the confusionmatrix for the validationset: 
+```{r acc,echo=FALSE,cache=TRUE}
 acc=cM$overall["Accuracy"]
 oob=round((1-acc),digits=3)
 cM
-#plot(fit_forest$finalModel)
-#plot(fit_forest)
 ``` 
 The *Accuracy* on the validationset is `r round(acc,digits=3)`, so the *out of sample error rate* is 1-`r round(acc,digits=3)`=  `r oob`. Since the validationset is not used for building the model, this is a good estimate for the *out of sample error*.
- 
- 
+  
+As a bonus, I want to see how the most important covariates relate to *classe*. Let's take a look at the (top 10) variable importance: 
+```{r plotvar,echo=FALSE,message=FALSE, fig.height=5,fig.width=12} 
+plot(varImp(fit_forest),top=10)
+```
+*roll_belt* and *yaw_belt* are on top. Let's see how they relate to *classe*: 
+```{r plotclas,echo=FALSE,fig.height=8,fig.width=12}
+      qplot(roll_belt,yaw_belt,data=valset,color=classe)
+```
